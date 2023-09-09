@@ -1,0 +1,330 @@
+---
+title: "How to avoid losing your bicycle in Toronto?"
+author: "Junjie Xu and Ruiqi Kang"
+date: "November 16, 2022"
+output:
+  pdf_document: default
+---
+
+
+```{r include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+library(ggplot2)
+library(ggforce)
+library(tidyverse)
+library(knitr)
+library(broom)
+bike <- read_csv("bicycle-thefts-2014-2019.csv")
+# data cleaning 
+bike$bcount <- 1
+bike %>%
+  sapply(function(x) sum(is.na(x)))
+# we want to see the missing data of this dataset and pick variables that do not contain too many NA values
+bike <- bike %>%
+  select("Occurrence_Month", "Premise_Type", "Bike_Colour", "Status", "Index_", "bcount")
+#In this case we try to find the relationship between 
+#Month--"Occurrence_Month" 
+#Location--"Premise_Type"
+#Colour--"Bike_Colour"
+#Type of the bike-- "Bike_Type"
+#And their status(whether stolen or not)--"Status"
+
+delete.na <- function(DF, n=0) {
+  DF[rowSums(is.na(DF)) <= n,]
+}
+# After picking the intended variables we do the data_cleaning of get rid of the observations with missing data
+bike <- delete.na(bike)
+```
+
+
+Because of the increased commuting time caused by traffic jams, or want to exercise for fitness, or due to environmental considerations, more and more people are using bicycles when they go out. However, bike theft is a significant nuisance for cyclists, causing financial and time costs. Based on the data provided by the Toronto Police Service Public Safety Data Portal, this article will give suggestions for people who plan to buy a new bicycle or replace their old bicycle, as well as bicycle owners on how to avoid losing their bikes in Toronto. These suggestions will focus on multiple dimensions, such as the bike's colour, the parking location, and the month of travel, to get the final result.
+
+
+# $\emph{Lost bicycles are extremely hard to get back}$
+```{r echo=FALSE}
+library(RColorBrewer)
+
+Stolen_bike <- bike %>%
+  filter(bike$Status == "STOLEN")
+Rstolen <- count(Stolen_bike)/count(bike)
+Recovered <- bike %>%
+  filter(bike$Status == "RECOVERED")
+RRecovered <- count(Recovered)/count(bike)
+
+
+ratio <- rep(c(Rstolen, RRecovered, 1-RRecovered-Rstolen),times=2)
+Bike_Status <-rep(c("Stolen", "Recovered","Unknown"),times=2)
+index <- c(0.9,1.1)
+
+A <- data.frame(index, Bike_Status,ratio )
+A <- A %>% 
+  select("index", "n", "Bike_Status")
+A$n[1] <- round(Rstolen,4)
+A$n[2] <- round(RRecovered,4)
+A$n[5] <- round(RRecovered,4)
+A$n[3] <- round((1-RRecovered-Rstolen),4)
+A$n[6] <- round((1-RRecovered-Rstolen),4)
+#library(viridis)
+#library(hrbrthemes)
+  
+#ggplot(A, aes(x=index, y=n, fill=Bike_Status)) +
+  #geom_area()+
+  #scale_fill_viridis(discrete = T)+
+  #theme_ipsum()
+# It is a chart with three percentages of Stolen Status in one column but the difference is so large which is 
+# 97% : 1.8% : 1.09% which is hard to distinguish
+```
+
+```{r echo=FALSE}
+#ggplot()+
+  #theme(panel.grid.major = element_blank(),
+        #panel.grid.minor = element_blank(),
+        #axis.ticks = element_blank(), 
+       # axis.text.y = element_blank(),
+        #axis.text.x = element_blank(),
+        #legend.title = element_text(face = "bold"), 
+        #panel.border = element_blank(),
+       # panel.background = element_rect(fill = "lightskyblue1"))+
+ # xlab("")+ylab('')+
+ # ggtitle("The Status of Reported Bike") + 
+ # geom_arc_bar(data=A,
+               #stat = "pie",
+              # aes(x0=0,y0=0,r0=0,r=2,
+                  # amount=ratio,fill=Bike_Status,
+                  # explode=c(0.05,0.1,0.05))
+ # )+
+  #annotate("text",x=1.6,y=1.5,label="97.1%",angle=-45)+
+  #annotate("text",x=-0.4,y=2.2,label="1.09%",angle=10)+
+  #annotate("text",x=0,y=2.25,label="1.82%",angle=0) + 
+  #guides(fill=guide_legend(title="Bike Status")) +
+  #scale_fill_brewer(palette="Set3") 
+
+# We build a pie chart for this percentage comparison, when communicating with TA during the office hour, he mentioned that pie chart might not be a good way to vis, and that is also what we learned in the class. So we decided to abandone this plan and build a new histogram.
+
+```
+
+```{r echo=FALSE}
+B <- A %>% 
+  filter(index <1)
+B <- B %>%
+  mutate(ID = rownames(B))
+B <- as.data.frame(B)
+B$n <- unlist(B$n)
+C <- B %>%
+  ggplot(aes(x = reorder(Bike_Status, desc(ID)), y = n, fill=Bike_Status)) +
+  geom_col() + 
+  coord_flip() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(), 
+        legend.title=element_blank(), 
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title = element_text(face = "bold"),
+        axis.title.y = element_text(face = "bold", angle = 0, vjust=0.5),
+        axis.text.x = element_text(face = "bold", angle = 0),
+        plot.title = element_text(face= "bold", size = 13, hjust=0.5, vjust=-0.2),
+        legend.position = "none")+
+  xlab("Status")+ylab("Percentage of overall cases")+
+  ggtitle("The Status of Reported Bike")+
+  scale_fill_brewer(palette="Pastel1")+ 
+  geom_text(aes(label=n*100), face = "bold", size=3.5, position = position_dodge(width = 1), hjust=0.4, colour= "Red")
+C
+
+```
+
+
+Lost and Found notice for bicycles is often seen in the newspaper and on social media, but whether or not lost bikes are eventually recovered seems to be little noticed or tracked. Some common guesses might be that the majority of lost bikes will be challenging to return to their owners. So, how do we define the majority, 70% or 80%? Our data analysis provided a surprising answer: the majority means 97.1%! Of the 20,000+ bicycles recorded as lost in Toronto between 2014 and 2019, 97.1% were eventually stolen, while only 1.09% of vehicles were finally recovered, which means that out of 100 stolen bicycles, almost only one is ever recovered. Unfortunately, if you lose your bike, you may need to accept that it will be extremely hard to get it back. Therefore, to avoid property damage, the best solution is to avoid losing your bike rather than waiting for it to be stolen and then trying to recover it.
+
+# $\emph{Black bicycles parked outside are the most vulnerable to theft}$
+```{r echo=FALSE}
+bicycle_thefts <- Stolen_bike %>%
+  group_by(Bike_Colour) %>%
+  summarise(total=n()) %>%
+  arrange(desc(total)) %>%
+  mutate(CP = cumsum(total)*100/nrow(Stolen_bike))
+  
+#bicycle_thefts helps us take a look at the data of stolen bike and help us determine how to properly divide them into three categories
+
+top_10_colour <- Stolen_bike %>%
+  group_by(Bike_Colour) %>%
+  summarise(case=n()) %>%
+  arrange(desc(case)) %>%
+  head(10)
+
+
+
+a <- ggplot(top_10_colour, aes(x=reorder(Bike_Colour, desc(case)), y=case, fill=case))+
+  geom_col() +
+  geom_text(aes(label=case), size=3.8, face = "bold", position = position_dodge(width = 1), vjust=0.353, colour= "Red") +
+  xlab("The colour of Stolen Bikes") +
+  ylab("Amount") +
+  ggtitle("Most 'Popular' Colors in Toronto Bike Thefts") +
+  theme(axis.text.x = element_text(face = "bold"),
+        plot.title = element_text(face = "bold", hjust=0.4),
+        axis.title = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(), axis.title.y = element_text(face = "bold", angle = 0, vjust=0.5),
+        legend.position = "none") + 
+    scale_fill_gradient(low="grey",high="blue")
+
+```
+
+```{r echo=FALSE}
+top_3_colours <- Stolen_bike %>%
+  group_by(Bike_Colour) %>%
+  summarise(case=n()) %>%
+  arrange(desc(case)) %>%
+  head(3)
+
+top_10_colours <- Stolen_bike %>%
+  filter(!Bike_Colour%in% c(unique(top_3_colours$Bike_Colour))) %>%
+  group_by(Bike_Colour) %>%
+  summarise(case=n()) %>%
+  arrange(desc(case)) %>%
+  head(7)
+  
+Rest_colours <- Stolen_bike %>%
+  filter(!Bike_Colour%in% c(unique(top_3_colours$Bike_Colour)) & ! Bike_Colour%in% c(unique(top_10_colours$Bike_Colour)) )%>%
+  group_by(Bike_Colour) %>%
+  summarise(case=n()) %>%
+  arrange(desc(case)) %>%
+  head(40)
+
+r_top_3_colour <- Stolen_bike %>%
+  filter(Bike_Colour%in% c(unique(top_3_colours$Bike_Colour))) %>%
+  group_by(Bike_Colour, Premise_Type) %>%
+  summarise(case=n(), .groups= 'drop') %>%
+  ggplot(aes(x=factor(Premise_Type, levels = c("Outside", "Apartment", "House", "Other", "Commercial")), y= case, fill= Premise_Type)) +
+  geom_boxplot()+
+   theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(), 
+        legend.title=element_blank(), 
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        legend.position = "none",axis.title = element_text(face = "bold"),
+        axis.text.x = element_text(face = "bold", angle = 30, hjust = 0.9, vjust = 0.9))+
+  xlab("Top 3 Colours")+ylab("")
+
+r_top_10_colour <- Stolen_bike %>%
+  filter(Bike_Colour%in% c(unique(top_10_colours$Bike_Colour))) %>%
+  group_by(Bike_Colour, Premise_Type) %>%
+  summarise(case=n(), .groups= 'drop') %>%
+  ggplot(aes(x=factor(Premise_Type, levels = c("Outside", "Apartment", "House", "Other", "Commercial")), y= case, fill= Premise_Type)) +
+  geom_boxplot() +
+   theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(), 
+        legend.title=element_blank(), 
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        legend.position = "none",
+        axis.title = element_text(face = "bold"),
+        axis.text.x = element_text(face = "bold", angle = 30, hjust = 0.9, vjust = 0.9))+
+  xlab("The 4th-10th Colours")+ylab("")
+
+r_rest_colour <- Stolen_bike %>%
+  filter(Bike_Colour%in% c(unique(Rest_colours$Bike_Colour))) %>%
+  group_by(Bike_Colour, Premise_Type) %>%
+  summarise(case=n(), .groups= 'drop') %>%
+  ggplot(aes(x=factor(Premise_Type, levels = c("Outside", "Apartment", "House", "Other", "Commercial")), y= case, fill= Premise_Type)) +
+  geom_boxplot()+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(), 
+        legend.title=element_blank(), 
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        legend.position = "none",
+        axis.title = element_text(face = "bold"),
+        axis.text.x = element_text(face = "bold", angle = 30, hjust = 0.9, vjust = 0.9))+
+  xlab("The 11th-50th Colours")+ylab("")
+```
+
+```{r echo=FALSE}
+library("gridExtra")
+grid.arrange(a,                          
+             arrangeGrob(r_top_3_colour, r_top_10_colour, r_rest_colour, ncol = 3), 
+             nrow = 2)
+```
+Based on the previous section, what characteristics of a bicycle can prevent it from being stolen must be figured out. For people looking to buy or update a bike, colour is the least restrictive feature compared to function and price when making a choice. By visualizing the data, we can find black bikes have the highest number of the 20,000+ lost bikes, over 6000, followed by blue and grey bicycles, with just under 2,000 units. Even though this phenomenon may be due to the fact that the market has the largest number of black bikes,  it makes sense that black bikes also have the largest number of lost bikes. But consumers who are shopping for bicycles avoid buying a black bicycle is still a wise choice if they do not have a strong preference for black.
+
+As for those who already own a bicycle and are not thinking of replacing it, they should be more careful if their bike is black, blue or grey. Another dimension to consider is introduced in the following visualization and analysis: the premise type of parking location. We divided the data into three groups: the top 3 colours in lost bikes, which account for approximately 50% of the total; the top 4-10 colours, which occupy 30% of all; and the 11th to 50th colours, which make up about the remaining 20%. As the boxplots show, the trend of the most vulnerable places for bicycles to be stolen did not vary across three different colour groups. The trend is that most theft cases happen when bikes are parked outside, then apartments, houses, and others, and the least likely places for theft are commercial areas. Therefore, our advice to cyclists is to try to park your bike in commercial areas, where the high volume of pedestrians and mostly installed monitoring makes it much more difficult to theft, and avoid parking your bike outside randomly. Even though we observed some patterns, there are outliers in the visualization of the group of top 11-50th colours, meaning the grouping may have some flaws. This situation may happen due to the number of missing vehicles in the 10th colour, dark blue, and the eleventh colour, yellow, which are very close to each other, at 337 and 299, respectively. While the difference between yellow and the other colours in the third group(11th-50th) is too big, leading to the appearance of outliers. After further adjustment, the trend obtained did not change, so we can make sure our previous advice not to park outside is solid.
+
+
+# $\emph{Summer is a high incidence of bicycle theft}$
+```{r echo=FALSE}
+
+#Stolen_bike$Occurrence_Month <- month.abb[Stolen_bike$Occurrence_Month]
+
+#stolen_month <- aggregate(bcount ~ Premise_Type + Occurrence_Month, 
+  #data=Stolen_bike, 
+  #function(x) { 
+    #c(sum=sum(x), avg=mean(x)) 
+#})
+
+# This build a table for us to read the sum of stolen cases in each month, and we could then decide if we are going to build a visual based on the data from the table
+
+library(RColorBrewer)
+Stolen_bike2 <- Stolen_bike %>% 
+   mutate(month = factor(month.abb[Occurrence_Month], levels = month.abb)) %>% 
+   group_by(month) %>%
+   summarise(each_month_cases=n()) %>%
+   arrange(month) 
+
+
+ggplot(Stolen_bike2, aes(month, each_month_cases, fill=each_month_cases))+
+  geom_col()+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(), 
+        legend.title=element_blank(), 
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title = element_text(face = "bold"),axis.title.y = element_text(face = "bold", angle = 0, vjust=0.5),
+        axis.text.x = element_text(face = "bold", angle = 30),
+        plot.title = element_text(face= "bold", size = 13))+
+  xlab("Occurrence Month")+ylab("Amount")+
+  ggtitle("The trend of Stolen Bike Cases in terms of Months")+
+  scale_fill_gradient2(low="grey", mid="white", high="blue",
+                      breaks=c(500,1000,1500,2000,2500,3000))
+```
+Apart from the bike's colour, the occurrence month of theft for bicycles is also an influencing factor worth investigating. To perform data analysis, the bar chart has been used to illustrate the total cases of bikes stolen across different months. We can see that the number of bicycle thefts is concentrated in the summer months of June, July and August, with over 3000 cases. And then it decreases in both directions, and December to March in winter is a less frequent period, all below 1000 cases. Thus, we recommend that cyclists take other transportation, such as TTC or driving, to commute in the summer. However, the alternative explanation for this discovery might be the weather because Toronto is often snowed in winter, the icy roads are too slippery for bicycles to pass, and thus people are cycling less, leading to fewer theft cases. Combined with the weather factor, the previous suggestion becomes less feasible because summer is the most suitable season for cycling. 
+
+
+# $\emph{Safest places for cyclists to park for different seasons}$
+```{r echo=FALSE}
+
+Stolen_bike <- Stolen_bike %>% 
+   mutate(month = factor(month.name[Occurrence_Month], levels = month.name)) %>% 
+   arrange(month)
+
+# We want to see if the trend of bike theft in terms of location is different in months. If the different exists we could give different suggestions in different months. If there does not have any difference, we could therefore give one concluding suggestion.
+
+mo <- ggplot(data=Stolen_bike, aes(x=Premise_Type, y=bcount, fill= Premise_Type )) + 
+  geom_col() + 
+  facet_wrap(~fct_inorder(month), scales = "free_y") + 
+  xlab("") +
+  ylab("Amount") +
+  ggtitle("Bike Stolen Cases in Different Month and Location") +
+  theme(axis.text.x = element_blank(),
+        plot.title = element_text(face = "bold"),
+        axis.title = element_text(face = "bold"),
+        panel.grid.major = element_blank(),
+        panel.background = element_blank(), axis.title.y = element_text(face = "bold", angle = 0, vjust=0.5),
+        legend.title=element_text(face = "bold")) + scale_fill_discrete(name = "Premise Type")
+mo
+
+```
+Since the previous section seemed to get bogged down in using only the occurrence month of bicycle theft as a variable, we added the dimension of premise type of parking location again. Then one possible hypothesis could be the places where bike theft happens most and least would be the same by month, as the pattern of the most and least vulnerable locations for bicycles to be stolen did not vary by colour groups in section 2. After we applied the analysis and constructed a side-by-side bar plot, we were surprised to find that the most vulnerable places for bike theft changed across seasons. In winter (December to February), bicycles are most likely to be stolen when parked in apartments, followed by parking outside, and there is not much difference between them. While in the other seasons, most thefts still occur outside, especially in the summer (June to August), where they far outnumber the other four kinds of venues. However, the commercial area is the least stolen area for bicycles throughout the year, except in January. In January, the premise for bikes least prone to be stolen is the house, but the number is also very close to that of commercial areas. Thus, we suggest you park your bicycles in commercial areas no matter what month today is, and avoid choosing the apartment in winter and outside in summer as your parking location.
+
+# $\emph{Overall suggestions to prevent your bicycles from being stolen}$
+In conclusion, bicycles are very difficult to retrieve once lost in Toronto, so bicyclists need to avoid losing their bikes. As we previously stated, there are still some limitations to our article. For instance, we did not have access to determine the total number of bikes in Toronto and their colours, and the weather conditions may have affected the accuracy of our analysis. As a result, we are unable to make a conclusive statement about the causality of a bike theft with respect to location or colour. Nevertheless, with the assistance of current data analysis and visualization, we offer some following suggestions that can hopefully help lessen the likelihood of theft for your bicycle.
+
+For those who are shopping for a bike, avoid black or even blue or grey cycles, as these are in the top three lists of lost bicycles. And for those who already own bicycles, a feasible operation is to park them in commercial areas and never outside. Another summary based on the visualization obtained is that summer is a high incidence of bicycle theft. Still, since it is difficult for cyclists not to ride their bikes in the summer, we recommend not leaving your bike parked outside from June to August as that is the most vulnerable place to theft. Similarly, do not park your bike in the apartment in winter. All in all, we recommend that cyclists choose commercial areas as parking locations for the whole year.
+
+
+\newpage
+## Bibliography
+Toronto Police Service Public Safety Data Portal. (2022, September 28). Bicycle Thefts. Data.torontopolice.on.ca. https://data.torontopolice.on.ca/datasets/bicycle-thefts/explore?location=43.700468%2C-79.429535%2C10.97
